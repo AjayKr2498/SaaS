@@ -1,0 +1,33 @@
+name: "Setup minio container"
+description: "Composite workflow to run minio container on the backgroud"
+inputs:
+  minio-user:
+    required: false
+    description: "minio user"
+    default: "minio123"
+  minio-password:
+    required: false
+    default: "minio123"
+    description: "minio password"
+  bucket-name:
+    required: true
+    description: "Bucket name"
+
+runs:
+  using: composite
+  steps:
+  - name: Docker build
+    shell: bash
+    run: docker run -p 0.0.0.0:9000:9000 -d -p 9001:9001 -e "MINIO_ROOT_USER=minio123" -e "MINIO_ROOT_PASSWORD=minio123" quay.io/minio/minio server /data --console-address ":9001"
+  - name: Install minio client
+    shell: bash
+    run: |
+      mkdir $HOME/minio-binaries
+      curl https://dl.min.io/client/mc/release/linux-amd64/mc --create-dirs -o $HOME/minio-binaries/mc
+      chmod +x $HOME/minio-binaries/mc
+      export PATH=$PATH:$HOME/minio-binaries/
+
+  - name: Create initial bucket
+    shell: bash
+    run: |
+      AWS_DEFAULT_REGION=us-east-1 AWS_ACCESS_KEY_ID=${{ inputs.minio-user }} AWS_SECRET_ACCESS_KEY=${{ inputs.minio-password }} aws --endpoint-url http://localhost:9000 s3 mb s3://${{ inputs.bucket-name }}

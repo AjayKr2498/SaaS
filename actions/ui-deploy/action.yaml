@@ -1,0 +1,79 @@
+name: "UI deploy"
+description: "Composite workflow to deploy UI"
+
+inputs:
+  version-dir:
+    type: string
+    required: false
+    description: "version" 
+  s3-bucket-name:
+    required: false
+    description: "S3 bucket name to host UI"
+    default: "."
+  vault-token:  
+    required: false
+    description: "Vault token"
+    default: "." 
+  env:
+    required: false
+    description: "Vault token"
+    default: "."   
+  distribution: 
+    required: false
+    description: "Invalidation distribution name"
+    default: "."
+    
+  
+runs:
+  using: composite
+  steps:
+  
+  - name: Check if the version has changed?
+    uses: dorny/paths-filter@v2
+    id: filter
+    with:
+      base: ${{ github.ref_name }}
+      filters: |
+        service:
+          - '${{ inputs.version-dir }}/*'   
+    
+  - name: Get the version from release.txt
+    if: ${{ steps.filter.outputs.service }} == 'true'
+    id: version
+    shell: bash
+    run: |
+      echo ${{ steps.filter.outputs.service }}
+      echo "tag=$(cat ${{ inputs.version-dir }}/release.txt)" >> $GITHUB_OUTPUT     
+
+  - name: Pull the build ${{ inputs.version }}
+    shell: bash
+    run: |
+      aws s3 sync s3://accuknox-ui-builds/${{ steps.version.outputs.tag }} .
+      aws s3 sync s3://accuknox-ui-builds/env/${{ inputs.env }}/ ./build/
+      ls
+    
+#   - name: Get Environment values
+#     uses: hashicorp/vault-action@v2
+#     id: vault
+#     with:
+#       url: https://accuknox-cluster-public-vault-7a7b6a0c.0736d533.z1.hashicorp.cloud:8200
+#       method: token
+#       token: ${{ inputs.vault-token }}
+#       namespace: admin
+#       secrets: |
+#         action/data/ui/${{ inputs.env }} env | env-value ;    
+
+#   - name: Save the Env values
+#     shell: bash
+#     run: |
+#       echo '${{ steps.vault.outputs.env-value }}' > ./build/env-config.js
+
+  - name: Deploy the UI build
+    shell: bash
+    run: aws s3 sync ./build s3://${{ inputs.s3-bucket-name }} 
+  
+  - name: Invalidate CloudFront
+    uses: chetan/invalidate-cloudfront-action@v2
+    env:
+      DISTRIBUTION: ${{ inputs.distribution }}
+      PATHS: "/*"

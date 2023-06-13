@@ -1,0 +1,37 @@
+name: "Docker push to ECR"
+description: "Composite workflow to push docker images to ECR"
+inputs:
+  docker-context:
+    required: false
+    description: "Docker context path to use"
+    default: "."
+  tag:
+    required: true
+    description: "Image tag"
+  image-name:
+    required: true
+    description: "Image name"
+  repo:
+    required: true
+    description: "Docker repo"
+
+
+runs:
+  using: composite
+  steps:
+  
+  - name: Docker build
+    uses: accuknox/common-gh-actions/actions/docker-build@main
+    with:
+      docker-context: ${{ inputs.docker-context }}
+      tag: ${{ inputs.tag }}
+      image-name: ${{ inputs.image-name }}
+      repo: ${{ inputs.repo }}
+
+  - name: Login to ECR
+    id: login-ecr
+    uses: aws-actions/amazon-ecr-login@v1
+
+  - name: Docker push to ECR
+    shell: bash
+    run: docker push ${{ inputs.repo }}/${{ inputs.image-name }}:${{ inputs.tag }}

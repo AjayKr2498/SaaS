@@ -1,0 +1,53 @@
+name: "Helm checks"
+description: "Composite workflow to perform helm checks"
+inputs:
+  runs-on:
+    type: string
+    required: false
+    default: ubuntu-latest
+    description: "OS to run the job on"
+  chart-path:
+    required: true
+    description: "Helm chart path"
+    default: "."   
+  revision-name:
+    type: string
+    required: true
+    description: "Revision name"  
+
+
+runs:
+  using: composite
+  steps:
+
+  - name: Helm template 
+    shell: bash
+    run: | 
+      for file in $(ls ${{ inputs.chart-path }}/values*.yaml)
+      do 
+        echo "Templating on ${file}" 
+        helm template ${{ inputs.chart-path }} -n ${{ inputs.namespace }} --values=$file --debug 2>&1 1>/dev/null && echo "Templating on ${file} was successful" || (echo "Templating on ${file} was unsuccessful" && exit 1)
+      done
+
+  - name: Helm lint
+    shell: bash
+    run: |  
+      for file in $(ls ${{ inputs.chart-path }}/values*.yaml)
+      do 
+        echo "Linting on ${file}" 
+        helm lint ${{ inputs.chart-path }} -n ${{ inputs.namespace }} --values=$file 2>&1 1>/dev/null && echo "Linting on ${file} was successful" || (echo "Linting on ${file} was unsuccessful" && exit 1)
+      done
+
+  - name: Start a local k8s cluster
+    uses: jupyterhub/action-k3s-helm@v3
+    with:
+      k3s-channel: latest
+  
+  - name: Helm dry run
+    shell: bash
+    run: |
+      for file in $(ls ${{ inputs.chart-path }}/values*.yaml)
+      do
+        echo "Dry run on ${file}" 
+        helm install ${{ inputs.revision-name }} ${{ inputs.chart-path }} --values=$file --dry-run 2>&1 1>/dev/null && echo "Dry run on ${file} was successful" || (echo "Dry run on ${file} was unsuccessful" && exit 1)
+      done

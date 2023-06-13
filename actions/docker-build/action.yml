@@ -1,0 +1,23 @@
+name: "Docker image build"
+description: "Composite workflow to build docker images"
+inputs:
+  docker-context:
+    required: false
+    description: "Docker context path to use"
+    default: "."
+  tag:
+    required: true
+    description: "Image tag"
+  image-name:
+    required: true
+    description: "Image name"
+  repo:
+    required: true
+    description: "Docker repo"
+
+runs:
+  using: composite
+  steps:
+  - name: Docker build
+    shell: bash
+    run: docker build -f ${{ inputs.docker-context }}/Dockerfile ${{ inputs.docker-context }} --tag ${{ inputs.repo }}/${{ inputs.image-name }}:${{ inputs.tag }}
