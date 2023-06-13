@@ -1,0 +1,93 @@
+name: "Helm deployment"
+
+on:
+  workflow_call:
+    inputs:
+      version-dir: 
+        type: string
+        required: true
+        description: "Version directory that release.txt" 
+      chart-name:  
+        type: string
+        required: true
+        description: "Helm chart name" 
+      namespace:
+        type: string
+        required: true
+        description: "Namespace to deploy"
+      values-file:
+        type: string
+        required: false
+        description: "Values file path"  
+      ecr-repo: 
+        type: string
+        required: false
+        description: "ECR repo name"  
+      ecr-region: 
+        type: string
+        required: false
+        description: "ECR repo region"  
+      eks-cluster: 
+        type: string
+        required: false
+        description: "EKS cluster name"  
+      eks-region:
+        type: string
+        required: false
+        description: "EKS cluster region"  
+    
+    secrets:
+      aws_access_key_id:
+        required: true
+        description: "AWS access key id"
+      aws_secret_access_key:
+        required: true
+        description: "AWS secret access key"  
+
+jobs:
+  isReady:
+    runs-on: ubuntu-latest    
+    outputs:
+      service: ${{ steps.filter.outputs.service }}
+    steps:
+    - uses: actions/checkout@v3
+  
+    - name: Check if the version has changed?
+      uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        base: ${{ github.ref_name }}
+        filters: |
+          service:
+            - '${{ inputs.version-dir }}/*'  
+
+  deploy:
+    runs-on: ubuntu-latest   
+    needs:  
+    - isReady
+    if: needs.isReady.outputs.service == 'true'
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Get the version from release.txt
+      id: version
+      shell: bash
+      run: echo "tag=$(cat ${{ inputs.version-dir }}/release.txt)" >> $GITHUB_OUTPUT     
+    
+    - name: Deploy ${{ inputs.version-dir }} in EKS
+      uses: accuknox/common-gh-actions/actions/helm-deploy@main       
+      with:
+        version: ${{ steps.version.outputs.tag }}
+        chart-name: ${{ inputs.chart-name }}
+        namespace: ${{ inputs.namespace }}
+        values-file: ${{ inputs.values-file }}
+        ecr-repo: ${{ inputs.ecr-repo }} 
+        ecr-region: ${{ inputs.ecr-region }}
+        eks-cluster: ${{ inputs.eks-cluster }}
+        eks-region: ${{ inputs.eks-region }}
+        aws-access-key-id: ${{ secrets.aws_access_key_id }}
+        aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
+          
+
+
+

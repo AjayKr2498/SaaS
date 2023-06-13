@@ -1,0 +1,26 @@
+name: "Test helm check"
+
+
+on:
+  push:
+    paths:
+      - "**"
+      - ".**"
+
+
+env:
+  CHART_PATH: src/chart
+  REVISION_NAME: test-chart
+
+
+jobs:
+  helm-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Helm checks
+      uses: ./actions/helm-check
+      with:
+        chart-path: ${{ env.CHART_PATH }}
+        revision-name: ${{ env.REVISION_NAME }}

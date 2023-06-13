@@ -1,0 +1,76 @@
+name: "UI deployment"
+
+on:
+  workflow_call:
+    inputs:
+      version-dir: 
+        type: string
+        required: true
+        description: "Version directory that release.txt" 
+      s3-bucket-name:
+        required: false
+        type: string
+        description: "S3 bucket name to host UI"
+      env:
+        required: false
+        type: string
+        description: "Vault token" 
+
+    secrets:
+      aws_access_key_id:
+        required: true
+        description: "AWS access key id"
+      aws_secret_access_key:
+        required: true
+        description: "AWS secret access key"  
+      vault-token:  
+        required: true
+        description: "Vault token" 
+        
+jobs:
+  isReady:
+    runs-on: ubuntu-latest    
+#     outputs:
+#       service: ${{ steps.filter.outputs.service }}
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Echo cred
+      shell: bash
+      run: |
+        echo ${{ secrets.aws-access-key-id }}
+        echo ${{ secrets.aws-secret-access-key }}
+        echo ${{ inputs.s3-bucket-name }}
+        echo ${{ secrets.vault-token }}
+  
+#     - name: Check if the version has changed?
+#       uses: dorny/paths-filter@v2
+#       id: filter
+#       with:
+#         base: ${{ github.ref_name }}
+#         filters: |
+#           service:
+#             - '${{ inputs.version-dir }}/*'  
+
+  deploy:
+    runs-on: ubuntu-latest   
+    needs:  
+    - isReady
+#     if: needs.isReady.outputs.service == 'true'
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Get the version from release.txt
+      id: version
+      shell: bash
+      run: echo "tag=$(cat ${{ inputs.version-dir }}/release.txt)" >> $GITHUB_OUTPUT     
+    
+    - name: Deploy ${{ inputs.version-dir }} in S3
+      uses: accuknox/common-gh-actions/actions/ui-deploy@main 
+      with:
+        s3-bucket-name: ${{ inputs.s3-bucket-name }}
+        vault-token: ${{ secrets.vault-token }}
+        env: ${{ inputs.env }}
+        version: ${{ steps.version.outputs.tag }}
+        aws-access-key-id: ${{ secrets.aws_secret_access_key }}
+        aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
