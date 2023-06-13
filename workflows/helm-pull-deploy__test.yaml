@@ -1,0 +1,23 @@
+name: "Test helm deployment"
+
+on:
+  push:
+    paths:
+      - "**"
+      - ".**"
+  
+jobs:
+  deploy:
+    uses:  accuknox/common-gh-actions/.github/workflows/helm-deploy.yaml@main  
+    with:
+      chart-name: "chart"
+      namespace: "test"
+      values-file: "chart/values.yaml"
+      version-dir: "src" 
+      ecr-repo: "956994857092.dkr.ecr.us-east-2.amazonaws.com"
+      ecr-region: "us-east-2"
+      eks-cluster: "AccuKnox-test"
+      eks-region: "us-east-2"
+    secrets:
+      aws_access_key_id: ${{ secrets.AWS_DEV_ACCESS_ID }}
+      aws_secret_access_key: ${{ secrets.AWS_DEV_SECRET_ID }}  

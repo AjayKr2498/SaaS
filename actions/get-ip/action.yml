@@ -1,0 +1,18 @@
+name: "Get runner IP"
+description: "Composite workflow to get runner IP"
+
+inputs: {}
+
+outputs:
+  ip:
+    value: ${{ steps.get-ip.outputs.ip }}
+    description: "Runner IP"
+
+runs:
+  using: composite
+  steps:
+  - id: get-ip
+    shell: bash
+    run: |
+      IP=$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
+      echo "ip=$IP" >> $GITHUB_OUTPUT

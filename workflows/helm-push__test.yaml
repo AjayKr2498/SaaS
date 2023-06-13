@@ -1,0 +1,30 @@
+name: "Test helm push"
+
+
+on:
+  push:
+    paths:
+      - "**"
+      - ".**"
+
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_DEV_ACCESS_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_DEV_SECRET_ID }} 
+  CHART_VERSION: "1.2.10"
+  CHART_PATH: src/chart
+
+
+jobs:
+  helm-push:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Helm push to ECR
+      uses: ./actions/helm-push
+      with:
+        chart-path: ${{ env.CHART_PATH }}
+        version: ${{ env.CHART_VERSION }}
+        ecr-region: us-east-2
+        ecr-repo: 956994857092.dkr.ecr.us-east-2.amazonaws.com

@@ -1,0 +1,85 @@
+definitions:
+  dto.Article:
+    properties:
+      body:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      title:
+        type: string
+    type: object
+  dto.Articles:
+    properties:
+      articles:
+        items:
+          $ref: '#/definitions/dto.Article'
+        type: array
+      total:
+        type: integer
+    type: object
+  dto.ErrorDTO:
+    properties:
+      error_code:
+        type: string
+      error_message:
+        type: string
+    type: object
+  dto.SuccessDTO:
+    properties:
+      message:
+        type: string
+    type: object
+info:
+  contact: {}
+  title: Swagger Documentation for API
+  version: "1.0"
+paths:
+  /article/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get Article  from database by its id
+      parameters:
+      - description: id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Article'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.SuccessDTO'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorDTO'
+      tags:
+      - common
+  /articles:
+    get:
+      consumes:
+      - application/json
+      description: List all the articles from database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Articles'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorDTO'
+      tags:
+      - common
+swagger: "2.0"

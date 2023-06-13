@@ -1,0 +1,125 @@
+name: go validate
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        required: true
+        description: "Golang project directory"
+      go-version:
+        type: string
+        required: true
+        default: "v1.18"
+        description: "Golang version to use" 
+      go-fmt:  
+        required: true
+        type: boolean
+        description: "Go format checks"
+      go-sec:
+        required: true
+        type: boolean
+        description: "Go security checks"
+      go-lint:
+        required: true
+        type: boolean
+        description: "Go lint checks"  
+      go-test:
+        required: true
+        type: boolean
+        description: "Go test"            
+      go-swagger:
+        required: true
+        type: boolean
+        description: "Swagger doc checks" 
+      go-build:
+        required: true
+        type: string
+        description: "go build" 
+      go-build-cmd:
+        required: false
+        type: string
+        default: "go build ."
+        description: "go build command"  
+                  
+    secrets:
+      git-key:
+        required: false
+        description: "Git key"    
+    
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout source
+      if: ( github.event_name == 'pull_request' || github.event_name == 'pull_request_target' )
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Checkout source
+      if: ${{ startsWith(github.ref, 'refs/tags/v') }} 
+      uses: actions/checkout@v2 
+
+    - name: Setup Go
+      if: ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request' || github.event_name == 'pull_request_target' )
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Pull the dependencies
+      if: ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request' || github.event_name == 'pull_request_target' )
+      shell: bash
+      run: |
+        mkdir ~/.ssh/
+        git config --global url."git@github.com:".insteadOf "https://github.com/"
+        echo "${{ secrets.git-key }}" > GIT-KEY
+        cp GIT-KEY ~/.ssh/id_rsa   
+        chmod 600 ~/.ssh/id_rsa 
+        touch ~/.ssh/known_hosts
+        ssh-keyscan github.com >> ~/.ssh/known_hosts 
+        go env -w GOPATH=~/go GOPRIVATE=github.com/accuknox
+        go mod download
+            
+    - name: Run Go Build
+      if: ( inputs.go-build  && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target' ))
+      shell: bash
+      env:
+        GOROOT: ""
+      run: ${{ inputs.go-build-cmd }}
+
+    - name: Check swagger docs
+      if: always() && ( inputs.go-swagger && ( startsWith(github.ref, 'refs/tags/v')  ||  github.event_name == 'pull_request' || github.event_name == 'pull_request_target' ))
+      shell: bash
+      run: |
+        go install github.com/swaggo/swag/cmd/swag@v1.8.10
+        export PATH=$(go env GOPATH)/bin:$PATH
+        swag init -o /tmp/
+        diff docs/swagger.json /tmp/swagger.json
+        diff docs/swagger.yaml /tmp/swagger.yaml
+        diff <(tail -n +4 docs/docs.go) <(tail -n +4 /tmp/docs.go)  
+
+    - name: Run Go Format Check
+      if: always() && ( inputs.go-fmt  && ( github.event_name == 'pull_request' || github.event_name == 'pull_request_target' ))
+      shell: bash
+      run: |
+        gofmt -s -d $(find . -type f -name '*.go' -print)
+        test -z "$(gofmt -s -l $(find . -type f -name '*.go' -print) | tee /dev/stderr)"
+
+    - name: Run Revive (Go Linter)
+      if: always() && ( inputs.go-lint && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target'))
+      uses: docker://morphy/revive-action:v2
+      
+    - name: Run Gosec Security Scanner
+      if: always() && ( inputs.go-sec && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request' || github.event_name == 'pull_request_target'))
+      uses: securego/gosec@master
+      env:
+        GOROOT: ""
+        GOPRIVATE: github.com/accuknox
+      with:
+        args: ${{ inputs.working-directory }}/...
+
+    - name: Run Unit Tests
+      if: always() && ( inputs.go-test && ( startsWith(github.ref, 'refs/tags/v')  || github.event_name == 'pull_request' || github.event_name == 'pull_request_target'))
+      shell: bash
+      run: go test ${{ inputs.working-directory }}/...

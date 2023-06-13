@@ -1,0 +1,79 @@
+name: "Helm pull from ECR & deploy in EKS"
+description: "Composite workflow to build and push a docker to a registry"
+inputs:
+  runs-on:
+    type: string
+    required: false
+    default: ubuntu-latest
+    description: "OS to run the job on"
+  chart-name:  
+    type: string
+    required: true
+    description: "Helm chart name" 
+  namespace:
+    type: string
+    required: true
+    description: "Namespace to deploy"
+  values-file:
+    type: string
+    required: false
+    description: "Values file path"   
+  ecr-repo: 
+      type: string
+      required: false
+      description: "ECR repo name"  
+  ecr-region: 
+    type: string
+    required: false
+    description: "ECR repo region"  
+  eks-cluster: 
+    type: string
+    required: false
+    description: "EKS cluster name"  
+  eks-region:
+    type: string
+    required: false
+    description: "EKS cluster region"   
+  aws-access-key-id:
+    type: string
+    required: false
+    description: "aws-access-key-id"  
+  aws-secret-access-key: 
+    type: string
+    required: false
+    description: "aws-secret-access-key"    
+  version:
+    type: string
+    required: false
+    description: "version"       
+
+
+
+
+runs:
+  using: composite
+
+  steps:
+
+  - name: Configure AWS Credentials
+    uses: aws-actions/configure-aws-credentials@v2
+    with:
+      aws-access-key-id: ${{ inputs.aws-access-key-id }}
+      aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+      aws-region: us-east-2
+
+  - name: Authenticate ECR authenticate
+    shell: bash
+    run: aws ecr get-login-password --region  ${{ inputs.ecr-region }} | helm registry login --username AWS --password-stdin  ${{ inputs.ecr-repo }}
+
+  - name: Connect EKS cluster 
+    shell: bash
+    run: aws eks update-kubeconfig --name ${{ inputs.eks-cluster }} --region ${{ inputs.eks-region }}
+
+  - name: helm pull from ECR
+    shell: bash
+    run: helm pull oci://${{ inputs.ecr-repo }}/${{ inputs.chart-name }} --version ${{ inputs.version }} --untar
+
+  - name: Helm deploy
+    shell: bash
+    run: helm upgrade --install ${{ inputs.chart-name }} ${{ inputs.chart-name }} --values=${{ inputs.values-file }} --version ${{ inputs.version }} -n ${{ inputs.namespace }}

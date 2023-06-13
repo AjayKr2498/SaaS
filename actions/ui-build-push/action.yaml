@@ -1,0 +1,32 @@
+name: "UI build and Push"
+description: "Composite workflow to build and push UI items"
+
+inputs:
+  s3-build-bucket-name:
+    required: false
+    description: "S3 bucket name"
+    default: "."
+  tag:
+    required: false
+    description: "tag version"
+    default: "."  
+
+runs:
+  using: composite
+  steps:
+  - name: Setup node
+    uses: actions/setup-node@v2
+
+  - name: Install dependencies
+    shell: bash
+    run: npm install --force
+
+  - name: Build static file
+    shell: bash
+    run: NODE_OPTIONS=--max-old-space-size=8192 npm run build
+    env:
+      CI: false
+
+  - name: Deploy static site to S3 bucket
+    shell: bash
+    run: aws s3 sync ./build s3://${{ inputs.s3-build-bucket-name }}/${{ inputs.tag }}/build

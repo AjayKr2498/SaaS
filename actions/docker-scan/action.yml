@@ -1,0 +1,62 @@
+name: "Trivy scan for docker image"
+description: "Composite workflow to scan docker images"
+inputs:
+  docker-context:
+    required: false
+    description: "Docker context path to use"
+    default: "."
+  tag:
+    required: true
+    description: "Image tag"
+  image-name:
+    required: true
+    description: "Image name"
+  repo:
+    required: true
+    description: "Docker repo"
+  s3-bucket-name:
+    required: true
+    type: string
+    description: "Bucket name to store trivy scan results"
+  trivy-exit-code:
+    required: true
+    type: number
+    description: "Exit code when specified vulnerabilities are found"
+  trivy-severity:
+    required: true
+    description: "Severities of vulnerabilities to scanned for and displayed"
+    type: string
+
+
+runs:
+  using: composite
+
+  steps:
+  
+  - name: Docker build
+    uses: accuknox/common-gh-actions/actions/docker-build@main
+    with:
+      docker-context: ${{ inputs.docker-context }}
+      tag: ${{ inputs.tag }}
+      image-name: ${{ inputs.image-name }}
+      repo: ${{ inputs.repo }}
+    
+  - name: Run Trivy vulnerability scanner
+    uses: aquasecurity/trivy-action@master
+    with:
+      image-ref: ${{ inputs.repo }}/${{ inputs.image-name }}:${{ inputs.tag }}
+      output: ./trivy-results
+      severity: ${{ inputs.trivy-severity }}
+      exit-code: ${{ inputs.trivy-exit-code }}
+
+  - name: Print trivy results
+    shell: bash
+    run: cat ./trivy-results 
+
+  - name: Publish report to S3
+    uses: prewk/s3-cp-action@v2
+    with:
+      aws_access_key_id: ${{ env.AWS_ACCESS_KEY_ID }}
+      aws_secret_access_key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+      source: ./trivy-results
+      dest: s3://${{ inputs.s3-bucket-name }}/${{ inputs.image-name }}/trivy-results-${{ inputs.tag }}
